@@ -10,22 +10,21 @@ import (
 	"golang.org/x/exp/io/i2c"
 )
 
-// Screen contains resources required to work with the OLED screen
-type Screen struct {
+// I2cOpener allows to open a real I2C screen
+type I2cOpener struct {
+}
+
+type i2cScreen struct {
 	dev *i2c.Device
 }
 
-// SignalLevels holds the number of supported signal levels
-var SignalLevels int
-
-// Open is an entry point to start working with the screen
-func Open() (*Screen, error) {
+func (o *I2cOpener) open() (Screen, error) {
 	dev, err := i2c.Open(&i2c.Devfs{Dev: "/dev/i2c-1"}, 0x3c)
 	if err != nil {
 		return nil, err
 	}
 
-	screen := &Screen{dev: dev}
+	screen := &i2cScreen{dev: dev}
 	if err := screen.init(); err != nil {
 		dev.Close()
 		return nil, err
@@ -33,7 +32,7 @@ func Open() (*Screen, error) {
 	return screen, nil
 }
 
-func (s *Screen) init() error {
+func (s *i2cScreen) init() error {
 	if err := s.dev.Write([]byte{0x00, 0xAE}); err != nil {
 		return fmt.Errorf("Failed to turn off: %v", err)
 	}
@@ -55,13 +54,11 @@ func (s *Screen) init() error {
 	return nil
 }
 
-// Close releases all the resources allocated by this instance of Screen
-func (s *Screen) Close() error {
+func (s *i2cScreen) Close() error {
 	return s.dev.Close()
 }
 
-// Clear erases screen RAM contents
-func (s *Screen) Clear() error {
+func (s *i2cScreen) Clear() error {
 	const width = 132
 	emptyLine := make([]byte, width+1)
 	for i := range emptyLine {
@@ -79,8 +76,7 @@ func (s *Screen) Clear() error {
 	return nil
 }
 
-// Print displays a string in the specified position of the screen
-func (s *Screen) Print(line int, offset int, message string) error {
+func (s *i2cScreen) Print(line int, offset int, message string) error {
 	if err := s.dev.Write([]byte{0x00, 0xB0 | byte(line&0x7), byte((offset + 2) & 0x07), 0x10 | byte(((offset+2)>>4)&0x07)}); err != nil {
 		return fmt.Errorf("Failed to set page and offset: %v", err)
 	}
@@ -101,8 +97,7 @@ func (s *Screen) Print(line int, offset int, message string) error {
 	return nil
 }
 
-// DisplaySignalLevel displays signal level icon in the specified position of the screen
-func (s *Screen) DisplaySignalLevel(line int, offset int, level int) error {
+func (s *i2cScreen) DisplaySignalLevel(line int, offset int, level int) error {
 	if err := s.dev.Write([]byte{0x00, 0xB0 | byte(line&0x7), byte((offset + 2) & 0x07), 0x10 | byte(((offset+2)>>4)&0x07)}); err != nil {
 		return fmt.Errorf("Failed to set page and offset: %v", err)
 	}
@@ -118,8 +113,7 @@ func (s *Screen) DisplaySignalLevel(line int, offset int, level int) error {
 	return nil
 }
 
-// DisplayImage loads image from the specified file and displays it on the screen
-func (s *Screen) DisplayImage(filepath string) error {
+func (s *i2cScreen) DisplayImage(filepath string) error {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return err

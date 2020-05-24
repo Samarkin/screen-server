@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestScreen(t *testing.T) {
-	dev, err := Open()
+func TestI2C(t *testing.T) {
+	dev, err := Open(&I2cOpener{})
 	if err != nil {
 		fmt.Printf("Failed to open: %v", err)
 		t.FailNow()

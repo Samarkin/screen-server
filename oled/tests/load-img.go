@@ -14,7 +14,7 @@ func main() {
 	} else {
 		filename = os.Args[1]
 	}
-	dev, err := oled.Open()
+	dev, err := oled.OpenI2C()
 	if err != nil {
 		log.Fatal(err)
 	}
