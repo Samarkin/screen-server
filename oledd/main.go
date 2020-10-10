@@ -103,16 +103,8 @@ func handleDeleteMessageOnLine(w http.ResponseWriter, r *http.Request) {
 	engine.GetEngine().ClearMessage(line)
 }
 
-func main() {
-	log.Printf("Initializing engine")
-	e := engine.GetEngine()
-	defer e.Shutdown()
-
+func newRouter() *mux.Router {
 	r := mux.NewRouter()
-	server := &http.Server{
-		Addr:    ":6533",
-		Handler: r,
-	}
 	r.HandleFunc("/api/health", handleGetHealth).Methods("GET")
 	r.HandleFunc("/api/messages", handleGetMessages).Methods("GET")
 	r.HandleFunc("/api/messages", handlePostMessage).Methods("POST")
@@ -120,7 +112,18 @@ func main() {
 	r.HandleFunc("/api/messages/{line:[0-7]}", handleGetMessageOnLine).Methods("GET")
 	r.HandleFunc("/api/messages/{line:[0-7]}", handlePutMessageOnLine).Methods("PUT")
 	r.HandleFunc("/api/messages/{line:[0-7]}", handleDeleteMessageOnLine).Methods("DELETE")
+	return r
+}
 
+func main() {
+	log.Printf("Initializing engine")
+	e := engine.GetEngine()
+	defer e.Shutdown()
+	r := newRouter()
+	server := &http.Server{
+		Addr:    ":6533",
+		Handler: r,
+	}
 	log.Printf("Listening on %s", server.Addr)
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Error: %s", err)

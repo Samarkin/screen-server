@@ -51,24 +51,24 @@ func (e *engine) GetLastError() string {
 
 func (e *engine) Clear() {
 	log.Printf("Clearing screen...")
+	for i := range e.messages {
+		e.messages[i] = ""
+	}
 	if e.scr == nil {
 		e.lastError = fmt.Errorf("Screen not connected")
 		return
-	}
-	for i := range e.messages {
-		e.messages[i] = ""
 	}
 	e.lastError = e.scr.Clear()
 }
 
 func (e *engine) ClearMessage(line int) {
 	log.Printf("Clearing message on line %d...", line)
+	if line >= 0 && line < 8 {
+		e.messages[line] = ""
+	}
 	if e.scr == nil {
 		e.lastError = fmt.Errorf("Screen not connected")
 		return
-	}
-	if line >= 0 && line < 8 {
-		e.messages[line] = ""
 	}
 	e.lastError = e.scr.Print(line, 0, strings.Repeat(" ", 21))
 }
@@ -80,12 +80,12 @@ func (e *engine) AppendMessage(text string) {
 
 func (e *engine) DisplayMessage(text string, line int) {
 	log.Printf("Displaying message \"%s\" on line %d...", text, line)
+	if line >= 0 && line < 8 {
+		e.messages[line] = text
+	}
 	if e.scr == nil {
 		e.lastError = fmt.Errorf("Screen not connected")
 		return
-	}
-	if line >= 0 && line < 8 {
-		e.messages[line] = text
 	}
 	e.lastError = e.scr.Print(line, 0, text)
 }
