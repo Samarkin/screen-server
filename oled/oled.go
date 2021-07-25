@@ -1,5 +1,7 @@
 package oled
 
+import "io"
+
 // SignalLevels holds the number of supported signal levels
 var SignalLevels int
 
@@ -9,8 +11,10 @@ type Screen interface {
 	Print(line int, offset int, message string) error
 	// DisplaySignalLevel displays signal level icon in the specified position of the screen
 	DisplaySignalLevel(line int, offset int, level int) error
-	// DisplayImage loads image from the specified file and displays it on the screen
-	DisplayImage(filepath string) error
+	// DisplayImageFile loads image from the specified file and displays it on the screen
+	DisplayImageFile(filepath string) error
+	// DisplayImage loads image from the provided reader and displays it on the screen
+	DisplayImage(reader io.Reader) error
 	// Clear erases screen RAM contents
 	Clear() error
 	// Close releases all the resources allocated by this instance of Screen

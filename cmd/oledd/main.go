@@ -76,6 +76,27 @@ func handlePostMessage(w http.ResponseWriter, r *http.Request) {
 	e.AppendMessage(msg.Text)
 }
 
+func handlePostPngImage(w http.ResponseWriter, r *http.Request) {
+	e, _ := engine.GetEngine()
+	var err error
+	durationString := r.URL.Query().Get("duration")
+	if len(durationString) > 0 {
+		var duration int64
+		if duration, err = strconv.ParseInt(durationString, 10, 32); err != nil {
+			http.Error(w, "Invalid duration", http.StatusBadRequest)
+			return
+		}
+		err = e.DisplayTemporaryImage(r.Body, time.Duration(duration)*time.Second)
+	} else {
+		err = e.DisplayImage(r.Body)
+	}
+	if err != nil {
+		log.Printf("Unable to display image: %s", err)
+		http.Error(w, "Unable to display the provided image", http.StatusBadRequest)
+		return
+	}
+}
+
 func handleDeleteMessages(w http.ResponseWriter, r *http.Request) {
 	e, _ := engine.GetEngine()
 	e.Clear()
@@ -186,6 +207,7 @@ func newRouter(loadPasswords func(auth.AuthenticationContext)) *mux.Router {
 	r.HandleFunc("/api/messages/{line:[0-7]}", handleGetMessageOnLine).Methods("GET")
 	r.HandleFunc("/api/messages/{line:[0-7]}", handlePutMessageOnLine).Methods("PUT")
 	r.HandleFunc("/api/messages/{line:[0-7]}", handleDeleteMessageOnLine).Methods("DELETE")
+	r.HandleFunc("/api/image/png", handlePostPngImage).Methods("POST")
 	return r
 }
 

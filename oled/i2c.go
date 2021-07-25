@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"image/png"
+	"io"
 	"os"
 	"strings"
 
@@ -113,13 +114,17 @@ func (s *i2cScreen) DisplaySignalLevel(line int, offset int, level int) error {
 	return nil
 }
 
-func (s *i2cScreen) DisplayImage(filepath string) error {
+func (s *i2cScreen) DisplayImageFile(filepath string) error {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-	img, err := png.Decode(file)
+	return s.DisplayImage(file)
+}
+
+func (s *i2cScreen) DisplayImage(reader io.Reader) error {
+	img, err := png.Decode(reader)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,7 @@
 package oled
 
 import (
+	"io"
 	"log"
 )
 
@@ -52,10 +53,18 @@ func (o *mockScreen) DisplaySignalLevel(line int, offset int, level int) error {
 	return nil
 }
 
-func (o *mockScreen) DisplayImage(filepath string) error {
+func (o *mockScreen) DisplayImageFile(filepath string) error {
 	if !o.open {
 		return ErrorScreenClosed
 	}
 	log.Printf("Mock screen is now displaying image \"%s\"", filepath)
+	return nil
+}
+
+func (o *mockScreen) DisplayImage(reader io.Reader) error {
+	if !o.open {
+		return ErrorScreenClosed
+	}
+	log.Printf("Mock screen is now displaying image from the provided reader")
 	return nil
 }

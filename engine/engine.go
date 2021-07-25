@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"strings"
 	"sync"
@@ -17,6 +18,8 @@ type Engine interface {
 	GetMessage(line int) string
 	DisplayMessage(text string, line int) error
 	DisplayTemporaryMessage(text string, line int, timeout time.Duration) error
+	DisplayImage(reader io.Reader) error
+	DisplayTemporaryImage(reader io.Reader, duration time.Duration) error
 	ClearMessage(line int) error
 	AppendMessage(text string) error
 	Shutdown()
@@ -132,6 +135,46 @@ func (e *engine) DisplayTemporaryMessage(text string, line int, duration time.Du
 		return fmt.Errorf("screen not connected")
 	}
 	return e.scr.Print(line, 0, text+padding)
+}
+
+func (e *engine) DisplayImage(reader io.Reader) error {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	for i := range e.messages {
+		e.messages[i] = message{"<IMAGE>", distantFuture}
+	}
+	if e.scr == nil {
+		return fmt.Errorf("screen not connected")
+	}
+	return e.scr.DisplayImage(reader)
+}
+
+func (e *engine) DisplayTemporaryImage(reader io.Reader, duration time.Duration) error {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	expiration := time.Now().Add(duration)
+	for i := range e.messages {
+		e.messages[i] = message{"<IMAGE>", expiration}
+	}
+	go func() {
+		time.Sleep(duration + smallDelay)
+		e.mutex.Lock()
+		defer e.mutex.Unlock()
+		log.Printf("Erasing image")
+		now := time.Now()
+		for i := range e.messages {
+			if now.After(e.messages[i].expiration) {
+				e.messages[i] = message{"", distantFuture}
+				if e.scr != nil {
+					e.scr.Print(i, 0, padding)
+				}
+			}
+		}
+	}()
+	if e.scr == nil {
+		return fmt.Errorf("screen not connected")
+	}
+	return e.scr.DisplayImage(reader)
 }
 
 func (e *engine) GetMessage(line int) string {
