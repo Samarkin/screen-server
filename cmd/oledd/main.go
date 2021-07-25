@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/samarkin/screen-server/auth"
@@ -19,18 +20,21 @@ const PASSWD_FILE_NAME = "./passwd"
 
 // Health contains information about the server
 type Health struct {
-	OS     string `json:"os"`
-	Status string `json:"status"`
+	OS           string `json:"os"`
+	Status       string `json:"status"`
+	ErrorMessage string `json:"errorMessage"`
 }
 
 func handleGetHealth(w http.ResponseWriter, r *http.Request) {
 	h := Health{
 		OS: runtime.GOOS,
 	}
-	if engine.GetEngine().Connected() {
+	e, err := engine.GetEngine()
+	if e.Connected() {
 		h.Status = "connected"
 	} else {
 		h.Status = "error"
+		h.ErrorMessage = err.Error()
 	}
 	json.NewEncoder(w).Encode(h)
 }
@@ -42,17 +46,19 @@ type MessageInfo struct {
 }
 
 func handleGetMessages(w http.ResponseWriter, r *http.Request) {
+	e, _ := engine.GetEngine()
 	var response [8]MessageInfo
 	for i := 0; i < 8; i++ {
 		response[i].Line = i
-		response[i].Text = engine.GetEngine().GetMessage(i)
+		response[i].Text = e.GetMessage(i)
 	}
 	json.NewEncoder(w).Encode(response)
 }
 
 // Message contains the text to display
 type Message struct {
-	Text string `json:"text"`
+	Text     string `json:"text"`
+	Duration *int   `json:"duration"`
 }
 
 func handlePostMessage(w http.ResponseWriter, r *http.Request) {
@@ -62,11 +68,17 @@ func handlePostMessage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid body", http.StatusBadRequest)
 		return
 	}
-	engine.GetEngine().AppendMessage(msg.Text)
+	if msg.Duration != nil {
+		http.Error(w, "Duration is not applicable here", http.StatusBadRequest)
+		return
+	}
+	e, _ := engine.GetEngine()
+	e.AppendMessage(msg.Text)
 }
 
 func handleDeleteMessages(w http.ResponseWriter, r *http.Request) {
-	engine.GetEngine().Clear()
+	e, _ := engine.GetEngine()
+	e.Clear()
 }
 
 func handlePutMessageOnLine(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +95,18 @@ func handlePutMessageOnLine(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid body", http.StatusBadRequest)
 		return
 	}
-	engine.GetEngine().DisplayMessage(msg.Text, line)
+	e, _ := engine.GetEngine()
+	if msg.Duration != nil {
+		duration := *msg.Duration
+		if duration > 3600 {
+			duration = 3600
+		} else if duration < 1 {
+			duration = 1
+		}
+		e.DisplayTemporaryMessage(msg.Text, line, time.Duration(duration)*time.Second)
+	} else {
+		e.DisplayMessage(msg.Text, line)
+	}
 }
 
 func handleGetMessageOnLine(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +117,8 @@ func handleGetMessageOnLine(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	line := int(line64)
-	msg := MessageInfo{line, engine.GetEngine().GetMessage(line)}
+	e, _ := engine.GetEngine()
+	msg := MessageInfo{line, e.GetMessage(line)}
 	json.NewEncoder(w).Encode(msg)
 }
 
@@ -106,7 +130,8 @@ func handleDeleteMessageOnLine(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	line := int(line64)
-	engine.GetEngine().ClearMessage(line)
+	e, _ := engine.GetEngine()
+	e.ClearMessage(line)
 }
 
 // LoginInfo contains login and password for authentication
@@ -166,7 +191,7 @@ func newRouter(loadPasswords func(auth.AuthenticationContext)) *mux.Router {
 
 func main() {
 	log.Printf("Initializing engine")
-	e := engine.GetEngine()
+	e, _ := engine.GetEngine()
 	defer e.Shutdown()
 	r := newRouter(loadPasswords)
 	server := &http.Server{

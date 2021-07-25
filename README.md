@@ -11,6 +11,7 @@ The goal of this project is to develop a remotely controlled OLED screen.
 1. Get the source code
 ```shell
 go get github.com/samarkin/screen-server/cmd/oledd
+go get github.com/samarkin/screen-server/cmd/create-user
 ```
 2. Disable go modules
 ```shell
@@ -18,6 +19,7 @@ go env -w GO111MODULE=auto
 ```
 3. Create user
 ```shell
+cd $GOPATH/src/github.com/samarkin/screen-server/cmd/oledd
 go run github.com/samarkin/screen-server/cmd/create-user
 ```
 4. Build and run
