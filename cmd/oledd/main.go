@@ -1,15 +1,21 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/samarkin/screen-server/auth"
 	"github.com/samarkin/screen-server/engine"
 )
+
+const PASSWD_FILE_NAME = "./passwd"
 
 // Health contains information about the server
 type Health struct {
@@ -103,8 +109,51 @@ func handleDeleteMessageOnLine(w http.ResponseWriter, r *http.Request) {
 	engine.GetEngine().ClearMessage(line)
 }
 
-func newRouter() *mux.Router {
+// LoginInfo contains login and password for authentication
+type LoginInfo struct {
+	Login    string `json:"login"`
+	Password string `json:"password"`
+}
+
+func handleLogin(context auth.AuthenticationContext, w http.ResponseWriter, r *http.Request) {
+	decoder := json.NewDecoder(r.Body)
+	var loginInfo LoginInfo
+	if err := decoder.Decode(&loginInfo); err != nil {
+		log.Printf("Authentication failed: %s", err)
+		http.Error(w, "Forbidden", http.StatusForbidden)
+	} else if token, err := context.AuthenticateUser(loginInfo.Login, loginInfo.Password); err != nil {
+		log.Printf("Authentication failed: %s", err)
+		http.Error(w, "Forbidden", http.StatusForbidden)
+	} else {
+		w.Header().Add("X-Session-Token", token)
+	}
+}
+
+func loadPasswords(context auth.AuthenticationContext) {
+	file, err := os.Open("./passwd")
+	if err != nil {
+		log.Println("Password file not found. Access to the main APIs will be disabled")
+		log.Println("Use `go run github.com/samarkin/screen-server/cmd/create-user` to create users")
+		return
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		columns := strings.Split(scanner.Text(), ":")
+		if len(columns) != 3 {
+			continue
+		}
+		context.LoadUser(columns[0], columns[1], columns[2])
+	}
+}
+
+func newRouter(loadPasswords func(auth.AuthenticationContext)) *mux.Router {
 	r := mux.NewRouter()
+	middleware, context := auth.NewAuthenticationMiddleware()
+	r.Use(middleware)
+	loadPasswords(context)
+	context.ExcludeOperation("POST", "/api/login")
+	r.HandleFunc("/api/login", func(w http.ResponseWriter, r *http.Request) { handleLogin(context, w, r) }).Methods("POST")
 	r.HandleFunc("/api/health", handleGetHealth).Methods("GET")
 	r.HandleFunc("/api/messages", handleGetMessages).Methods("GET")
 	r.HandleFunc("/api/messages", handlePostMessage).Methods("POST")
@@ -119,7 +168,7 @@ func main() {
 	log.Printf("Initializing engine")
 	e := engine.GetEngine()
 	defer e.Shutdown()
-	r := newRouter()
+	r := newRouter(loadPasswords)
 	server := &http.Server{
 		Addr:    ":6533",
 		Handler: r,

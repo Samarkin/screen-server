@@ -1,5 +1,8 @@
 # ScreenServer API Description
 
+#### `POST /api/login`
+Authenticate user.
+
 #### `GET /api/health`
 Get information about the server.
 
